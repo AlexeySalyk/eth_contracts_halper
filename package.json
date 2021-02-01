@@ -1,0 +1,33 @@
+{
+  "name": "eth_contracts_halper",
+  "version": "0.1.0",
+  "description": "utility for compiling and creating ethereum smart contracts",
+  "main": "index.js",
+  "dependencies": {
+    "solc": "^0.8.1",
+    "web3": "^1.3.3"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlexeySalyk/eth_contracts_halper.git"
+  },
+  "keywords": [
+    "eth",
+    "ethereum",
+    "smart",
+    "contact",
+    "solc",
+    "solidity",
+    "compiler"
+  ],
+  "author": "Alexey Salylk",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/AlexeySalyk/eth_contracts_halper/issues"
+  },
+  "homepage": "https://github.com/AlexeySalyk/eth_contracts_halper#readme"
+}
