@@ -1,6 +1,6 @@
 {
   "name": "eth_contracts_halper",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "utility for compiling and creating ethereum smart contracts",
   "main": "index.js",
   "dependencies": {
@@ -24,7 +24,7 @@
     "solidity",
     "compiler"
   ],
-  "author": "Alexey Salylk",
+  "author": "Alexey Salyk",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/AlexeySalyk/eth_contracts_halper/issues"
