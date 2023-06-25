@@ -28,7 +28,7 @@ class Contract {
             for (const key in param.replacements) {
                 if (Object.hasOwnProperty.call(param.replacements, key)) {
                     const replace = param.replacements[key];
-                    this.sourceCode = this.sourceCode.replace(key, replace);
+                    this.sourceCode = this.sourceCode.replaceAll(key, replace);
                 }
             }
         }

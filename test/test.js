@@ -22,6 +22,11 @@ describe('Comple of smart contract', () => {
         let a = new Contract({ filePath: __dirname + '/test_contracts/b.sol', contractName: 'MSGSender_v800', compilerVersion: '0.8.20' });
         expect(a.name).to.be.equal('MSGSender_v800');
     });
+
+    it('replacing contract name', async () => {
+        let a = new Contract({ filePath: __dirname + '/test_contracts/a.sol', contractName: 'MSGSender_v426_replaced', compilerVersion: 'v0.4.26+commit.4563c3fc', replacements: { 'MSGSender_v426': 'MSGSender_v426_replaced' } });
+        expect(a.name).to.be.equal('MSGSender_v426_replaced');
+    });
 });
 
 
