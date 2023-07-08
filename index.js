@@ -12,6 +12,7 @@ class Contract {
      * @param {string} param.sourceCode
      * @param {Object} param.replacements {key:value} object, key is the value to be replaced, and value is what will be instead on source code
      * @param {string} param.contractName name of solidity contract inside source file 
+     * @param {string} param.compilerVersion version of solidity compiler, like 0.8.20
      */
     constructor(param) {
 
@@ -40,75 +41,96 @@ class Contract {
 
         // loading compiler
         if (param.compilerVersion) {
-            let solc_alerrnative = null;
+            if (param.compilerVersion == 'remote') return;
             try {
-                solc_alerrnative = require('solc_' + param.compilerVersion);
-            } catch (error) { }
-
-            if (solc_alerrnative) {
+                let solc_alerrnative = require('solc_' + param.compilerVersion);
                 if (DEBUG) console.log('using local alternative compiler version:', solc_alerrnative.version());
                 this._compile(solc_alerrnative);
-            } else {
-                if (DEBUG) console.log('using remote compiler version:', param.compilerVersion, 'downloading...');
-                if (!param.compilerVersion.includes('commit')) throw new Error('compiler version must include commit hash, like v0.8.20+commit.5b0b510c see https://etherscan.io/solcversions for available versions');
-                if (!param.compilerVersion.includes('v')) param.compilerVersion = 'v' + param.compilerVersion;
-
-                // if compiler version is not installed, will be downloaded from remote
-                this._remoteCompiler(param.compilerVersion);
+            } catch (error) {
+                console.error('error (use compilerVersion: "remote" for remote ver.) loading local alternative compiler:', error);
             }
         } else {
-            if (DEBUG) console.log('using local compiler version:', solc.version());
+            if (DEBUG) console.log('using default compiler version:', solc.version());
             this._compile(solc);
         }
     }
 
+    // properties:
+    sourceCode = null;
+    name = null;
 
-    _compile = (_solc) => {
+    contract = null;
+    bytecode = null;
+    methods = null;
+    deployed = null;
+    functionHashes = null;
+    compiledWithVersion = null; // version used to compile contract
 
-        var input = {
-            language: 'Solidity',
-            sources: {
-                'source1.sol': {
-                    content: this.sourceCode
-                }
-            },
-            settings: {
-                outputSelection: {
-                    '*': {
-                        '*': ['*']
+
+    _compile = (_solc, remote = false) => {
+        //Old library version (only for local package)
+        if (_solc.version().includes('0.4.26') && !remote) {
+            let output = _solc.compile(this.sourceCode, 1);
+            let ctr = output.contracts[':' + this.name];
+            if (!ctr) {
+                output.errors.forEach(element => {
+                    console.error(element);
+                });
+                throw new Error("CONTRACTS NOT COMPILED");
+            }
+
+            let abi = JSON.parse(ctr.interface);
+            this.contract = new web3.eth.Contract(abi);
+
+            this.bytecode = ctr.bytecode;
+            this.methods = this.contract.methods;
+            this.deploy = this.contract.deploy;
+            this.functionHashes = ctr.functionHashes;
+        } else {  // New library version    
+            // compiler config
+            var input = {
+                language: 'Solidity',
+                sources: {
+                    'source1.sol': {
+                        content: this.sourceCode
                     }
                 },
-                optimizer: {
-                    // disabled by default
-                    enabled: true,
-                    // Optimize for how many times you intend to run the code.
-                    // Lower values will optimize more for initial deployment cost, higher values will optimize more for high-frequency usage.
-                    runs: 200
+                settings: {
+                    outputSelection: {
+                        '*': {
+                            '*': ['*']
+                        }
+                    },
+                    optimizer: {
+                        // disabled by default
+                        enabled: true,
+                        // Optimize for how many times you intend to run the code.
+                        // Lower values will optimize more for initial deployment cost, higher values will optimize more for high-frequency usage.
+                        runs: 200
+                    },
+                    //stopAfter: "parsing",
                 },
-                //stopAfter: "parsing",
-            },
-        };
+            };
 
-        var haveErrors = false;
-        let output = null;
-
-        // if (_solc.version().includes('0.4.26')) {
-        //     output = _solc.compile({ sources: input.sources },1);
-        // }
-        output = _solc.compile(JSON.stringify(input));
-        if (output.errors) {
-            console.log('compiling contract', output.errors);
-            haveErrors = 1;
-        } else {
-            this.compilerOutput = JSON.parse(output);
-            this.compilerOutput.errors?.forEach(error => {
+            let output = _solc.compile(JSON.stringify(input));
+            output = JSON.parse(output);
+            let haveErrors = false;
+            output.errors?.forEach(error => {
                 if (error.type == 'CompilerError' || error.type == 'ParserError') {
                     console.error('compiler error:', error);
                     haveErrors = 1;
                 }
             });
+            if (haveErrors) throw new Error("CONTRACT NOT COMPILED");
+
+            let abi = output.contracts['source1.sol'][this.name].abi;
+            this.contract = new web3.eth.Contract(abi);
+
+            this.bytecode = output.contracts['source1.sol'][this.name].evm.bytecode.object;
+            this.methods = this.contract.methods;
+            this.deploy = this.contract.deploy;
+            this.functionHashes = output.contracts['source1.sol'][this.name].evm.methodIdentifiers;
         }
-        if (haveErrors) throw new Error("CONTRACT NOT COMPILED");
 
         // Clean up after solidity. Note you must run this after calling solc.compile().
         //process.removeAllListeners("uncaughtException");
@@ -122,15 +144,19 @@ class Contract {
         solc_listener = listeners[listeners.length - 1];
         if (solc_listener) process.removeListener("unhandledRejection", solc_listener);
 
-        let abi = this.compilerOutput.contracts['source1.sol'][this.name].abi;
-        this.contract = new web3.eth.Contract(abi);
-
-        this.bytecode = this.compilerOutput.contracts['source1.sol'][this.name].evm.bytecode.object;
-        this.methods = this.contract.methods;
-        this.deploy = this.contract.deploy;
+        this.compiledWithVersion = _solc.version();
     }
 
-    _remoteCompiler = async (compilerVersion) => {
+    /**
+     * download remote compiler version and compile contract
+     * @param {String} compilerVersion compiler version, like v0.8.20+commit.5b0b510c see https://etherscan.io/solcversions for available versions
+     * @returns {Promise} promise with contract object
+     */
+    remoteCompiler = async (compilerVersion) => {
+        if (DEBUG) console.log('using remote compiler version:', compilerVersion, 'downloading...');
+        if (!compilerVersion.includes('commit')) throw new Error('compiler version must include commit hash, like v0.8.20+commit.5b0b510c see https://etherscan.io/solcversions for available versions');
+
+        if (!compilerVersion.includes('v')) compilerVersion = 'v' + compilerVersion;
         const thisCtx = this;
         return new Promise((resolve, reject) => {
             solc.loadRemoteVersion(compilerVersion, function (err, solcSnapshot) {
@@ -138,7 +164,7 @@ class Contract {
                     console.error('error loading remote compiler version:', compilerVersion, err);
                     return reject(err);
                 }
-                thisCtx._compile(solcSnapshot);
+                thisCtx._compile(solcSnapshot, 1);
                 resolve(thisCtx);
             });
         });
@@ -146,11 +172,12 @@ class Contract {
 
 
     /**
-     * @param {String} func function, like declared in solidity
+     * Returns function selector if function is declared in contract otherwise returns undefined
+     * @param {String} func function, like declared in solidity -example myFunc(uint256,uint256)
      * @returns {String} function selector
     */
     getFuncHash = (func) => {
-        return "0x" + this.compilerOutput.contracts['source1.sol'][this.name].evm.methodIdentifiers[func];
+        return "0x" + this.functionHashes[func];
     }
 
     /**
@@ -160,7 +187,7 @@ class Contract {
      */
     getDeployData = (args = []) => {
         return this.contract.deploy({
-            data: this.compilerOutput.contracts['source1.sol'][this.name].evm.bytecode.object,
+            data: this.bytecode,
             arguments: args
         }).encodeABI();
     }
