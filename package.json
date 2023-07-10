@@ -1,6 +1,6 @@
 {
   "name": "eth_contracts_halper",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "utility for compiling and creating ethereum smart contracts",
   "main": "index.js",
   "dependencies": {

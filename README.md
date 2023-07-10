@@ -59,6 +59,19 @@ npm install eth_contracts_halper
   let contract = await contract.remoteCompile('v0.4.26+commit.4563c3fc')
   ```
 
+- ## Call contract methods
+
+  You can call contract methods using the methods object. Don't forget to set web3 provider during contract initialization.
+
+  ```js
+  var contract = new Contract({
+        filePath: __dirname + '/contranct.sol',
+        contractName: 'CONTRACT'
+        web3Provider: 'http://localhost:8545'
+  });
+  let result = await contract.methods.methodName().call();
+  ```
+
 ## Debugging
 
 For debugging mode you need to set DEBUG environment variable  

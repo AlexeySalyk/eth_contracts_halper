@@ -1,7 +1,6 @@
 const solc = require('solc');
 const fs = require('fs');
 var Web3 = require('web3');
-var web3 = new Web3();
 const DEBUG = process.env.DEBUG || false;
 
 class Contract {
@@ -13,9 +12,12 @@ class Contract {
      * @param {Object} param.replacements {key:value} object, key is the value to be replaced, and value is what will be instead on source code
      * @param {string} param.contractName name of solidity contract inside source file 
      * @param {string} param.compilerVersion version of solidity compiler, like 0.8.20
+     * @param {string} param.web3Provider web3 provider, like http://localhost:8545 (using for call contract methods)
      */
     constructor(param) {
 
+        this.web3 = new Web3(param.web3Provider || 'http://localhost:8545');
+        
         // loading source code
         if (param.filePath) {
             if (this.sourceCode) console.error('the source code already passed to constructor by filePath, and will be ignored');
@@ -80,7 +82,7 @@ class Contract {
             }
 
             let abi = JSON.parse(ctr.interface);
-            this.contract = new web3.eth.Contract(abi);
+            this.contract = new this.web3.eth.Contract(abi);
 
             this.bytecode = ctr.bytecode;
             this.methods = this.contract.methods;
@@ -124,7 +126,7 @@ class Contract {
             if (haveErrors) throw new Error("CONTRACT NOT COMPILED");
 
             let abi = output.contracts['source1.sol'][this.name].abi;
-            this.contract = new web3.eth.Contract(abi);
+            this.contract = new this.web3.eth.Contract(abi);
 
             this.bytecode = output.contracts['source1.sol'][this.name].evm.bytecode.object;
             this.methods = this.contract.methods;
